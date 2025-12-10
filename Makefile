@@ -108,7 +108,9 @@ version-patch:
 	echo "Updating version from $$current_version to $$new_version"; \
 	sed -i '' "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
 	sed -i '' "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
-	echo "Updated pyproject.toml and __init__.py to version $$new_version"
+	sed -i '' "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
+	sed -i '' "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
+	echo "Updated pyproject.toml, __init__.py, and docs-src/conf.py to version $$new_version"
 
 version-minor:
 	@echo "Incrementing minor version..."
@@ -120,7 +122,9 @@ version-minor:
 	echo "Updating version from $$current_version to $$new_version"; \
 	sed -i '' "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
 	sed -i '' "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
-	echo "Updated pyproject.toml and __init__.py to version $$new_version"
+	sed -i '' "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
+	sed -i '' "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
+	echo "Updated pyproject.toml, __init__.py, and docs-src/conf.py to version $$new_version"
 
 version-major:
 	@echo "Incrementing major version..."
@@ -131,4 +135,6 @@ version-major:
 	echo "Updating version from $$current_version to $$new_version"; \
 	sed -i '' "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
 	sed -i '' "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
-	echo "Updated pyproject.toml and __init__.py to version $$new_version"
+	sed -i '' "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
+	sed -i '' "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
+	echo "Updated pyproject.toml, __init__.py, and docs-src/conf.py to version $$new_version"

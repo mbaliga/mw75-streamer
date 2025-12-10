@@ -14,15 +14,15 @@ __maintainer__ = "Arctop"
 __company__ = "Arctop"
 
 # Import main classes for easy access
-from .data.packet_processor import EEGPacket, PacketProcessor, ChecksumStats
-from .data.streamers import CSVWriter, WebSocketStreamer, StdoutStreamer
-
 # Import device classes conditionally (macOS only)
 import sys
 
+from .data.packet_processor import ChecksumStats, EEGPacket, PacketProcessor
+from .data.streamers import CSVWriter, StdoutStreamer, WebSocketStreamer
+
 if sys.platform == "darwin":
-    from .device.mw75_device import MW75Device  # noqa: F401
     from .device.ble_manager import BLEManager  # noqa: F401
+    from .device.mw75_device import MW75Device  # noqa: F401
     from .device.rfcomm_manager import RFCOMMManager  # noqa: F401
 else:
     # On non-macOS platforms, these will be None
@@ -39,7 +39,7 @@ except ImportError:
     _LSL_AVAILABLE = False
 
 # Import testing utilities
-from .testing import show_quick_start, open_browser_test, validate_test_setup
+from .testing import open_browser_test, show_quick_start, validate_test_setup
 
 __all__ = [
     "EEGPacket",
