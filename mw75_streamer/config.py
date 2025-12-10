@@ -36,6 +36,10 @@ BLE_SESSION_DELAY: Final[float] = 1.0
 BLE_DISCOVERY_TIMEOUT: Final[float] = 4.0
 RFCOMM_CONNECTION_TIMEOUT: Final[float] = 10.0
 
+# Data streaming health monitoring
+DATA_PACKET_TIMEOUT: Final[float] = 8.0  # Seconds without data before declaring connection lost
+DATA_TIMEOUT_CHECK_INTERVAL: Final[float] = 2.0  # How often to check for timeout
+
 # Device Discovery
 MW75_DEVICE_NAME_PATTERN: Final[str] = "MW75"
 
