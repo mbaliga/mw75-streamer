@@ -14,8 +14,8 @@ import logging
 import sys
 import time
 import uuid
-from typing import Optional, Dict, Any, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 # WebSocket imports with fallback
 try:
@@ -35,10 +35,11 @@ from ..utils.logging import get_logger
 # Platform-specific imports
 # For type checking, always import the types; at runtime, only on macOS
 if TYPE_CHECKING or sys.platform == "darwin":
+    from Foundation import NSDate, NSRunLoop
+
+    from ..data.packet_processor import EEGPacket, PacketProcessor
     from ..device.mw75_device import MW75Device
     from ..device.rfcomm_manager import RFCOMMManager
-    from ..data.packet_processor import PacketProcessor, EEGPacket
-    from Foundation import NSRunLoop, NSDate
 
 if sys.platform != "darwin":
     # At runtime on non-macOS, these will be None
@@ -80,7 +81,9 @@ class WebSocketLogHandler(logging.Handler):
                     # Create async task to broadcast log to all clients
                     asyncio.create_task(
                         self.server._send_log(
-                            level=record.levelname, message=log_message, logger_name=record.name
+                            level=record.levelname,
+                            message=log_message,
+                            logger_name=record.name,
                         )
                     )
         except Exception:
@@ -128,6 +131,10 @@ class MW75WebSocketServer:
         # Heartbeat
         self.heartbeat_interval = 30.0  # seconds
 
+        # Data streaming health monitoring
+        self.last_packet_time: Optional[float] = None
+        self.data_timeout_task: Optional[asyncio.Task] = None
+
         # Device connection task
         self.device_connection_task: Optional[asyncio.Task] = None
 
@@ -149,7 +156,9 @@ class MW75WebSocketServer:
         print("=" * 80)
 
         try:
+            # fmt: off
             async with websockets.serve(self._handle_client, self.host, self.port) as server:  # type: ignore[arg-type]
+                # fmt: on
                 self._server = server
                 print(f"Server ready! Listening on ws://{self.host}:{self.port}")
                 print()
@@ -280,6 +289,11 @@ class MW75WebSocketServer:
                 await self._cancel_task(self.reconnect_task)
                 self.reconnect_task = None
 
+                # Stop data timeout monitoring
+                await self._cancel_task(self.data_timeout_task)
+                self.data_timeout_task = None
+                self.last_packet_time = None
+
                 # Stop RFCOMM streaming if active (before cancelling task)
                 if self.device and self.device.rfcomm_manager:
                     self.device.rfcomm_manager.stop()
@@ -319,7 +333,11 @@ class MW75WebSocketServer:
             await self._send_to_client(
                 websocket,
                 msg_type="error",
-                data={"message": "Invalid JSON", "code": "INVALID_JSON", "timestamp": time.time()},
+                data={
+                    "message": "Invalid JSON",
+                    "code": "INVALID_JSON",
+                    "timestamp": time.time(),
+                },
             )
             return
 
@@ -377,7 +395,10 @@ class MW75WebSocketServer:
             )
 
     async def _handle_connect_command(
-        self, data: Dict[str, Any], request_id: Optional[str], websocket: WebSocketServerProtocol
+        self,
+        data: Dict[str, Any],
+        request_id: Optional[str],
+        websocket: WebSocketServerProtocol,
     ) -> None:
         """Handle connect command from client"""
         # Check if another client has control
@@ -461,7 +482,10 @@ class MW75WebSocketServer:
         await self._connect_device()
 
     async def _handle_disconnect_command(
-        self, _data: Dict[str, Any], request_id: Optional[str], websocket: WebSocketServerProtocol
+        self,
+        _data: Dict[str, Any],
+        request_id: Optional[str],
+        websocket: WebSocketServerProtocol,
     ) -> None:
         """Handle disconnect command from client"""
         # Check if this client has control
@@ -492,7 +516,10 @@ class MW75WebSocketServer:
         )
 
         # Disconnect device
-        if self.device and self.device_state in [DeviceState.CONNECTED, DeviceState.CONNECTING]:
+        if self.device and self.device_state in [
+            DeviceState.CONNECTED,
+            DeviceState.CONNECTING,
+        ]:
             await self._disconnect_device()
         else:
             await self._broadcast_message(
@@ -506,7 +533,10 @@ class MW75WebSocketServer:
             )
 
     async def _handle_status_command(
-        self, _data: Dict[str, Any], request_id: Optional[str], websocket: WebSocketServerProtocol
+        self,
+        _data: Dict[str, Any],
+        request_id: Optional[str],
+        websocket: WebSocketServerProtocol,
     ) -> None:
         """Handle status command from client"""
         status_info = {
@@ -537,7 +567,10 @@ class MW75WebSocketServer:
         )
 
     async def _handle_broadcast_command(
-        self, data: Dict[str, Any], request_id: Optional[str], websocket: WebSocketServerProtocol
+        self,
+        data: Dict[str, Any],
+        request_id: Optional[str],
+        websocket: WebSocketServerProtocol,
     ) -> None:
         """Handle broadcast message from client - forward to all other clients"""
         # Get client address for identification
@@ -578,7 +611,8 @@ class MW75WebSocketServer:
         try:
             self.device_state = DeviceState.CONNECTING
             await self._send_status(
-                state=DeviceState.CONNECTING.value, message="Connecting to MW75 device..."
+                state=DeviceState.CONNECTING.value,
+                message="Connecting to MW75 device...",
             )
 
             # Initialize packet processor and device
@@ -666,6 +700,11 @@ class MW75WebSocketServer:
             print("Successfully connected to MW75 device!")
             print("Streaming..")
 
+            # Start data timeout monitoring
+            self.last_packet_time = None
+            self.data_timeout_task = asyncio.create_task(self._data_timeout_monitor())
+            self.logger.debug("Data timeout monitoring task started")
+
             # Run RFCOMM event loop interleaved with asyncio
             # NSRunLoop MUST be on main thread for delegates to work
             self.logger.info("Starting data streaming loop (interleaved with asyncio)...")
@@ -699,6 +738,13 @@ class MW75WebSocketServer:
             if self.auto_reconnect_enabled:
                 await self._start_reconnect_loop()
         finally:
+            # Stop data timeout monitoring
+            if self.data_timeout_task and not self.data_timeout_task.done():
+                await self._cancel_task(self.data_timeout_task)
+                self.data_timeout_task = None
+                self.last_packet_time = None
+                self.logger.debug("Data timeout monitoring task stopped")
+
             # Connection ended - clean up device resources
             if connection_successful:
                 print("Device streaming ended")
@@ -752,7 +798,8 @@ class MW75WebSocketServer:
         try:
             self.device_state = DeviceState.DISCONNECTING
             await self._send_status(
-                state=DeviceState.DISCONNECTING.value, message="Disconnecting from MW75 device..."
+                state=DeviceState.DISCONNECTING.value,
+                message="Disconnecting from MW75 device...",
             )
             print("Disconnecting from MW75 device...")
 
@@ -870,6 +917,9 @@ class MW75WebSocketServer:
             return
 
         try:
+            # Update last packet timestamp for health monitoring
+            self.last_packet_time = time.time()
+
             # Create async task to broadcast EEG data to all clients
             asyncio.create_task(self._send_eeg_data(packet))
         except Exception as e:
@@ -895,13 +945,140 @@ class MW75WebSocketServer:
                 await self._send_to_client(
                     websocket,
                     msg_type="heartbeat",
-                    data={"timestamp": time.time(), "battery_level": self._get_battery_level()},
+                    data={
+                        "timestamp": time.time(),
+                        "battery_level": self._get_battery_level(),
+                    },
                 )
 
         except asyncio.CancelledError:
             pass
         except Exception as e:
             self.logger.error(f"Heartbeat error: {e}")
+
+    async def _data_timeout_monitor(self) -> None:
+        """
+        Monitor data stream health and detect device disconnection
+
+        Checks periodically if data packets are still arriving from the device.
+        If no packets received within DATA_PACKET_TIMEOUT, assumes device is
+        disconnected (e.g., powered off) and triggers cleanup/reconnect.
+        """
+        from ..config import DATA_PACKET_TIMEOUT, DATA_TIMEOUT_CHECK_INTERVAL
+
+        try:
+            # Wait for first packet to arrive before starting monitoring
+            while self.last_packet_time is None:
+                await asyncio.sleep(DATA_TIMEOUT_CHECK_INTERVAL)
+
+                # Exit if device state changed
+                if self.device_state != DeviceState.CONNECTED:
+                    self.logger.debug("Data timeout monitor exiting - device not connected")
+                    return
+
+            self.logger.debug(f"Data timeout monitoring started (timeout={DATA_PACKET_TIMEOUT}s)")
+
+            # Monitor loop
+            while self.device_state == DeviceState.CONNECTED:
+                await asyncio.sleep(DATA_TIMEOUT_CHECK_INTERVAL)
+
+                # Calculate time since last packet
+                if self.last_packet_time is not None:
+                    time_since_last_packet = time.time() - self.last_packet_time
+
+                    # Check for timeout
+                    if time_since_last_packet > DATA_PACKET_TIMEOUT:
+                        self.logger.warning(
+                            f"Data timeout detected: {time_since_last_packet:.1f}s since last packet "
+                            f"(threshold: {DATA_PACKET_TIMEOUT}s)"
+                        )
+
+                        # Also check RFCOMM state as secondary signal
+                        rfcomm_still_connected = (
+                            self.device
+                            and self.device.rfcomm_manager
+                            and self.device.rfcomm_manager.connected
+                        )
+
+                        self.logger.info(
+                            f"Device appears disconnected (RFCOMM state: {rfcomm_still_connected})"
+                        )
+
+                        # Notify clients of timeout
+                        await self._broadcast_message(
+                            msg_type="error",
+                            data={
+                                "message": f"Device data stream timeout ({time_since_last_packet:.1f}s without data)",
+                                "code": "DATA_STREAM_TIMEOUT",
+                                "timestamp": time.time(),
+                            },
+                        )
+
+                        # Trigger disconnect and cleanup
+                        await self._handle_data_timeout()
+                        return
+
+        except asyncio.CancelledError:
+            self.logger.debug("Data timeout monitor cancelled")
+        except Exception as e:
+            self.logger.error(f"Error in data timeout monitor: {e}")
+
+    async def _handle_data_timeout(self) -> None:
+        """
+        Handle data stream timeout (device likely powered off)
+
+        Performs cleanup and triggers auto-reconnect if enabled.
+        """
+        if self.device_state not in [DeviceState.CONNECTED, DeviceState.CONNECTING]:
+            return
+
+        try:
+            self.logger.info("Handling data timeout - initiating cleanup")
+            self.device_state = DeviceState.DISCONNECTING
+
+            await self._send_status(
+                state=DeviceState.DISCONNECTING.value,
+                message="Device connection lost (data timeout detected)",
+            )
+
+            # Stop RFCOMM streaming loop
+            if self.device and self.device.rfcomm_manager:
+                self.device.rfcomm_manager.stop()
+                await asyncio.sleep(0.1)
+
+            # Clean up device resources
+            if self.device:
+                try:
+                    await self.device.cleanup()
+                except Exception as cleanup_error:
+                    self.logger.error(f"Error during timeout cleanup: {cleanup_error}")
+                finally:
+                    self.device = None
+                    self.packet_processor = None
+                    self.last_packet_time = None
+
+            self.device_state = DeviceState.DISCONNECTED
+            await self._send_status(
+                state=DeviceState.DISCONNECTED.value,
+                message="Device disconnected due to data timeout",
+            )
+
+            # Trigger auto-reconnect if enabled
+            if self.auto_reconnect_enabled:
+                self.logger.info("Auto-reconnect enabled - starting reconnect loop")
+                await self._start_reconnect_loop()
+
+        except Exception as e:
+            self.logger.error(f"Error handling data timeout: {e}")
+            self.device_state = DeviceState.ERROR
+            await self._broadcast_message(
+                msg_type="error",
+                data={
+                    "message": f"Error during timeout handling: {e}",
+                    "code": "TIMEOUT_HANDLER_ERROR",
+                    "timestamp": time.time(),
+                },
+            )
 
     async def _send_to_client(
         self,
