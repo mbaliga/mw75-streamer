@@ -132,8 +132,7 @@ class MockRFCOMMManager:
                 elapsed = time.perf_counter() - start_time
                 actual_rate = packet_count / elapsed
                 self.logger.debug(
-                    f"Mock streaming: {packet_count} packets, "
-                    f"actual rate: {actual_rate:.1f} Hz"
+                    f"Mock streaming: {packet_count} packets, " f"actual rate: {actual_rate:.1f} Hz"
                 )
 
             # Sleep for remainder of interval

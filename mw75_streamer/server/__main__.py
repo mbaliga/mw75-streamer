@@ -47,13 +47,9 @@ WebSocket Protocol:
         "--port", "-p", type=int, default=8080, help="Port to listen on (default: 8080)"
     )
 
-    parser.add_argument(
-        "--host", default="localhost", help="Host to bind to (default: localhost)"
-    )
+    parser.add_argument("--host", default="localhost", help="Host to bind to (default: localhost)")
 
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     parser.add_argument(
         "--mock",
@@ -71,9 +67,7 @@ WebSocket Protocol:
     if not args.mock and MW75WebSocketServer is None:
         logger.error("MW75 WebSocket server is only available on macOS")
         logger.error("Current platform: %s", sys.platform)
-        logger.info(
-            "Tip: Use --mock flag for development with synthetic data"
-        )
+        logger.info("Tip: Use --mock flag for development with synthetic data")
         sys.exit(1)
 
     try:

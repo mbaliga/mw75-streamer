@@ -99,9 +99,7 @@ class WebSocketLogHandler(logging.Handler):
 class MW75WebSocketServer:
     """WebSocket server for remote MW75 device control"""
 
-    def __init__(
-        self, host: str = "localhost", port: int = 8080, use_mock: bool = False
-    ):
+    def __init__(self, host: str = "localhost", port: int = 8080, use_mock: bool = False):
         """
         Initialize MW75 WebSocket server
 
@@ -111,9 +109,7 @@ class MW75WebSocketServer:
             use_mock: Use mock device for development (cross-platform)
         """
         if not WEBSOCKETS_AVAILABLE:
-            raise ImportError(
-                "websockets library not found. Install with: pip install websockets"
-            )
+            raise ImportError("websockets library not found. Install with: pip install websockets")
 
         if not use_mock and MW75Device is None:
             raise RuntimeError("MW75Device not available on this platform (macOS only)")
@@ -205,9 +201,7 @@ class MW75WebSocketServer:
         # Accept all clients - no rejection for multiple connections
         async with self.client_lock:
             self.clients.add(websocket)
-            print(
-                f"Client connected from {client_address} (Total clients: {len(self.clients)})"
-            )
+            print(f"Client connected from {client_address} (Total clients: {len(self.clients)})")
             self.logger.info(f"Client connected: {client_address}")
 
         try:
@@ -274,9 +268,7 @@ class MW75WebSocketServer:
             # Remove client from set
             if websocket in self.clients:
                 self.clients.discard(websocket)
-                self.logger.info(
-                    f"Client removed. Remaining clients: {len(self.clients)}"
-                )
+                self.logger.info(f"Client removed. Remaining clients: {len(self.clients)}")
 
             # Cancel this client's heartbeat
             if websocket in self.client_heartbeats:
@@ -326,9 +318,7 @@ class MW75WebSocketServer:
 
                 # If device wasn't cleaned up by the task (shouldn't happen), clean up now
                 if self.device:
-                    self.logger.warning(
-                        "Device not cleaned up by connection task, cleaning up now"
-                    )
+                    self.logger.warning("Device not cleaned up by connection task, cleaning up now")
                     try:
                         await self.device.cleanup()
                     except Exception as e:
@@ -651,13 +641,9 @@ class MW75WebSocketServer:
                 )
             else:
                 # Use real device - Disable signal handler in device - we handle Ctrl+C at server level
-                self.device = MW75Device(
-                    self._handle_device_data, setup_signal_handler=False
-                )
+                self.device = MW75Device(self._handle_device_data, setup_signal_handler=False)
                 # Start device connection in background
-                self.device_connection_task = asyncio.create_task(
-                    self._device_connection_task()
-                )
+                self.device_connection_task = asyncio.create_task(self._device_connection_task())
 
         except Exception as e:
             self.logger.error(f"Error initiating device connection: {e}")
@@ -676,9 +662,7 @@ class MW75WebSocketServer:
         connection_successful = False
         try:
             # Ensure device is initialized
-            assert self.device is not None, (
-                "Device must be initialized before connection task"
-            )
+            assert self.device is not None, "Device must be initialized before connection task"
 
             # Start BLE activation
             print("Discovering MW75 device via BLE...")
@@ -711,9 +695,7 @@ class MW75WebSocketServer:
             # Establish RFCOMM connection
             print("Establishing data connection (RFCOMM)...")
             self.logger.info("Establishing RFCOMM connection...")
-            self.device.rfcomm_manager = RFCOMMManager(
-                device_name, self.device.data_callback
-            )
+            self.device.rfcomm_manager = RFCOMMManager(device_name, self.device.data_callback)
             if not self.device.rfcomm_manager.connect():
                 print("RFCOMM connection failed")
                 self.logger.error("RFCOMM connection failed")
@@ -747,9 +729,7 @@ class MW75WebSocketServer:
 
             # Run RFCOMM event loop interleaved with asyncio
             # NSRunLoop MUST be on main thread for delegates to work
-            self.logger.info(
-                "Starting data streaming loop (interleaved with asyncio)..."
-            )
+            self.logger.info("Starting data streaming loop (interleaved with asyncio)...")
             await self._run_rfcomm_streaming()
 
         except Exception as e:
@@ -771,9 +751,7 @@ class MW75WebSocketServer:
                     self.device = None
                     self.packet_processor = None
                 except Exception as cleanup_error:
-                    self.logger.error(
-                        f"Error during cleanup after device error: {cleanup_error}"
-                    )
+                    self.logger.error(f"Error during cleanup after device error: {cleanup_error}")
                     # Still clear references even on error
                     self.device = None
                     self.packet_processor = None
@@ -805,9 +783,7 @@ class MW75WebSocketServer:
                         self.device = None
                         self.packet_processor = None
                     except Exception as cleanup_error:
-                        self.logger.error(
-                            f"Error during device cleanup: {cleanup_error}"
-                        )
+                        self.logger.error(f"Error during device cleanup: {cleanup_error}")
                         # Still clear references even on error
                         self.device = None
                         self.packet_processor = None
@@ -827,9 +803,7 @@ class MW75WebSocketServer:
             self.logger.info("Using mock RFCOMM manager (no BLE required)")
 
             # Create mock RFCOMM manager
-            mock_rfcomm_manager = MockRFCOMMManager(
-                "MW75-MOCK", self._handle_device_data
-            )
+            mock_rfcomm_manager = MockRFCOMMManager("MW75-MOCK", self._handle_device_data)
 
             if not mock_rfcomm_manager.connect():
                 print("Mock RFCOMM connection failed")
@@ -1057,9 +1031,7 @@ class MW75WebSocketServer:
 
             # Schedule coroutine to run in the event loop from worker thread
             if self._loop is not None:
-                asyncio.run_coroutine_threadsafe(
-                    self._send_eeg_data(packet), self._loop
-                )
+                asyncio.run_coroutine_threadsafe(self._send_eeg_data(packet), self._loop)
         except Exception as e:
             self.logger.error(f"Error handling EEG packet: {e}")
 
@@ -1111,14 +1083,10 @@ class MW75WebSocketServer:
 
                 # Exit if device state changed
                 if self.device_state != DeviceState.CONNECTED:
-                    self.logger.debug(
-                        "Data timeout monitor exiting - device not connected"
-                    )
+                    self.logger.debug("Data timeout monitor exiting - device not connected")
                     return
 
-            self.logger.debug(
-                f"Data timeout monitoring started (timeout={DATA_PACKET_TIMEOUT}s)"
-            )
+            self.logger.debug(f"Data timeout monitoring started (timeout={DATA_PACKET_TIMEOUT}s)")
 
             # Monitor loop
             while self.device_state == DeviceState.CONNECTED:
@@ -1326,9 +1294,7 @@ class MW75WebSocketServer:
             "counter": packet.counter,
             "ref": packet.ref,
             "drl": packet.drl,
-            "channels": {
-                f"ch{i + 1}": packet.channels[i] for i in range(len(packet.channels))
-            },
+            "channels": {f"ch{i + 1}": packet.channels[i] for i in range(len(packet.channels))},
             "feature_status": packet.feature_status,
         }
 

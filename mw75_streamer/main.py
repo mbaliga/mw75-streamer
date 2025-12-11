@@ -96,10 +96,7 @@ class MW75Streamer:
         else:
             self.stdout_streamer = StdoutStreamer(
                 print_header=(
-                    not csv_file
-                    and not websocket_url
-                    and not lsl_stream_name
-                    and not eeg_callback
+                    not csv_file and not websocket_url and not lsl_stream_name and not eeg_callback
                 )
             )
         self.packet_processor = PacketProcessor(self.verbose or False)
@@ -213,8 +210,7 @@ class MW75Streamer:
                     "ref": packet.ref,
                     "drl": packet.drl,
                     "channels": {
-                        f"ch{i + 1}": packet.channels[i]
-                        for i in range(len(packet.channels))
+                        f"ch{i + 1}": packet.channels[i] for i in range(len(packet.channels))
                     },
                     "feature_status": packet.feature_status,
                 }
@@ -282,17 +278,13 @@ class MW75Streamer:
             self.logger.info("Connecting to mock MW75 device...")
 
             # Create mock RFCOMM manager
-            self.mock_rfcomm_manager = MockRFCOMMManager(
-                "MW75-MOCK", self._handle_device_data
-            )
+            self.mock_rfcomm_manager = MockRFCOMMManager("MW75-MOCK", self._handle_device_data)
 
             if not self.mock_rfcomm_manager.connect():
                 self.logger.error("Mock RFCOMM connection failed")
                 return False
 
-            self.logger.info(
-                "Mock device connected - streaming synthetic data at ~500Hz"
-            )
+            self.logger.info("Mock device connected - streaming synthetic data at ~500Hz")
 
             # Run mock streaming loop (blocking call, runs in executor)
             await asyncio.get_event_loop().run_in_executor(
@@ -376,9 +368,7 @@ Examples:
         help='LSL stream name for Lab Streaming Layer output (e.g., "MW75_EEG")',
     )
 
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
     parser.add_argument(
         "--mock",
@@ -408,12 +398,7 @@ Examples:
     args = parser.parse_args()
 
     # Handle default values and validation
-    if (
-        not args.csv_file
-        and not args.websocket
-        and not args.lsl_stream
-        and not args.browser
-    ):
+    if not args.csv_file and not args.websocket and not args.lsl_stream and not args.browser:
         print(
             "No output specified - streaming EEG data to stdout",
             file=sys.stderr,
@@ -460,9 +445,7 @@ async def main() -> None:
     if not args.mock and _MW75Device is None:
         logger.error("MW75 device support is only available on macOS")
         logger.error("Current platform: %s", sys.platform)
-        logger.info(
-            "Tip: Use --mock flag for cross-platform development with synthetic data"
-        )
+        logger.info("Tip: Use --mock flag for cross-platform development with synthetic data")
         logger.info(
             "For cross-platform support contributions, see: https://github.com/arctop/mw75-streamer/blob/main/CONTRIBUTING.md"
         )
@@ -515,9 +498,7 @@ async def main() -> None:
             panel_html = os.path.join(os.path.dirname(__file__), "panel", "panel.html")
             webbrowser.open(f"file://{panel_html}")
         except Exception:
-            logger.warning(
-                "Failed to open browser automatically. Open panel/panel.html manually."
-            )
+            logger.warning("Failed to open browser automatically. Open panel/panel.html manually.")
 
     success = await streamer.start_streaming()
 
