@@ -50,6 +50,9 @@ if sys.platform != "darwin":
     NSRunLoop = None  # noqa: F811
     NSDate = None  # noqa: F811
 
+# Mock device support (cross-platform)
+from ..device.mock_rfcomm_manager import MockRFCOMMManager
+
 
 class DeviceState(Enum):
     """MW75 device connection states"""
@@ -78,14 +81,16 @@ class WebSocketLogHandler(logging.Handler):
                 client_level_value = getattr(logging, self.server.client_log_level)
                 if record.levelno >= client_level_value:
                     log_message = self.format(record)
-                    # Create async task to broadcast log to all clients
-                    asyncio.create_task(
-                        self.server._send_log(
-                            level=record.levelname,
-                            message=log_message,
-                            logger_name=record.name,
+                    # Schedule coroutine to run in the event loop from logging thread
+                    if self.server._loop is not None:
+                        asyncio.run_coroutine_threadsafe(
+                            self.server._send_log(
+                                level=record.levelname,
+                                message=log_message,
+                                logger_name=record.name,
+                            ),
+                            self.server._loop,
                         )
-                    )
         except Exception:
             # Silently ignore errors in log handler to avoid recursion
             pass
@@ -94,20 +99,26 @@ class WebSocketLogHandler(logging.Handler):
 class MW75WebSocketServer:
     """WebSocket server for remote MW75 device control"""
 
-    def __init__(self, host: str = "localhost", port: int = 8080):
+    def __init__(
+        self, host: str = "localhost", port: int = 8080, use_mock: bool = False
+    ):
         """
         Initialize MW75 WebSocket server
 
         Args:
             host: Host to bind to
             port: Port to listen on
+            use_mock: Use mock device for development (cross-platform)
         """
         if not WEBSOCKETS_AVAILABLE:
-            raise ImportError("websockets library not found. Install with: pip install websockets")
+            raise ImportError(
+                "websockets library not found. Install with: pip install websockets"
+            )
 
-        if MW75Device is None:
+        if not use_mock and MW75Device is None:
             raise RuntimeError("MW75Device not available on this platform (macOS only)")
 
+        self.use_mock = use_mock
         self.host = host
         self.port = port
         self.logger = get_logger(__name__)
@@ -144,6 +155,9 @@ class MW75WebSocketServer:
         # Server state
         self._server: Optional[Any] = None
 
+        # Event loop reference for thread-safe task scheduling
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
     async def start(self) -> None:
         """Start the WebSocket server"""
         print("=" * 80)
@@ -154,6 +168,9 @@ class MW75WebSocketServer:
         print("Commands: connect, disconnect, status")
         print("Press Ctrl+C to stop server")
         print("=" * 80)
+
+        # Store event loop reference for thread-safe task scheduling
+        self._loop = asyncio.get_running_loop()
 
         try:
             # fmt: off
@@ -188,7 +205,9 @@ class MW75WebSocketServer:
         # Accept all clients - no rejection for multiple connections
         async with self.client_lock:
             self.clients.add(websocket)
-            print(f"Client connected from {client_address} (Total clients: {len(self.clients)})")
+            print(
+                f"Client connected from {client_address} (Total clients: {len(self.clients)})"
+            )
             self.logger.info(f"Client connected: {client_address}")
 
         try:
@@ -255,7 +274,9 @@ class MW75WebSocketServer:
             # Remove client from set
             if websocket in self.clients:
                 self.clients.discard(websocket)
-                self.logger.info(f"Client removed. Remaining clients: {len(self.clients)}")
+                self.logger.info(
+                    f"Client removed. Remaining clients: {len(self.clients)}"
+                )
 
             # Cancel this client's heartbeat
             if websocket in self.client_heartbeats:
@@ -305,7 +326,9 @@ class MW75WebSocketServer:
 
                 # If device wasn't cleaned up by the task (shouldn't happen), clean up now
                 if self.device:
-                    self.logger.warning("Device not cleaned up by connection task, cleaning up now")
+                    self.logger.warning(
+                        "Device not cleaned up by connection task, cleaning up now"
+                    )
                     try:
                         await self.device.cleanup()
                     except Exception as e:
@@ -615,13 +638,26 @@ class MW75WebSocketServer:
                 message="Connecting to MW75 device...",
             )
 
-            # Initialize packet processor and device
+            # Initialize packet processor
             self.packet_processor = PacketProcessor(verbose=False)
-            # Disable signal handler in device - we handle Ctrl+C at server level
-            self.device = MW75Device(self._handle_device_data, setup_signal_handler=False)
 
-            # Start device connection in background
-            self.device_connection_task = asyncio.create_task(self._device_connection_task())
+            if self.use_mock:
+                # Use mock device - skip BLE, create device with mock RFCOMM manager
+                # We still need PacketProcessor for data parsing
+                self.logger.info("Using mock MW75 device (no hardware required)")
+                # Start mock device connection in background
+                self.device_connection_task = asyncio.create_task(
+                    self._mock_device_connection_task()
+                )
+            else:
+                # Use real device - Disable signal handler in device - we handle Ctrl+C at server level
+                self.device = MW75Device(
+                    self._handle_device_data, setup_signal_handler=False
+                )
+                # Start device connection in background
+                self.device_connection_task = asyncio.create_task(
+                    self._device_connection_task()
+                )
 
         except Exception as e:
             self.logger.error(f"Error initiating device connection: {e}")
@@ -640,7 +676,9 @@ class MW75WebSocketServer:
         connection_successful = False
         try:
             # Ensure device is initialized
-            assert self.device is not None, "Device must be initialized before connection task"
+            assert self.device is not None, (
+                "Device must be initialized before connection task"
+            )
 
             # Start BLE activation
             print("Discovering MW75 device via BLE...")
@@ -673,7 +711,9 @@ class MW75WebSocketServer:
             # Establish RFCOMM connection
             print("Establishing data connection (RFCOMM)...")
             self.logger.info("Establishing RFCOMM connection...")
-            self.device.rfcomm_manager = RFCOMMManager(device_name, self.device.data_callback)
+            self.device.rfcomm_manager = RFCOMMManager(
+                device_name, self.device.data_callback
+            )
             if not self.device.rfcomm_manager.connect():
                 print("RFCOMM connection failed")
                 self.logger.error("RFCOMM connection failed")
@@ -707,7 +747,9 @@ class MW75WebSocketServer:
 
             # Run RFCOMM event loop interleaved with asyncio
             # NSRunLoop MUST be on main thread for delegates to work
-            self.logger.info("Starting data streaming loop (interleaved with asyncio)...")
+            self.logger.info(
+                "Starting data streaming loop (interleaved with asyncio)..."
+            )
             await self._run_rfcomm_streaming()
 
         except Exception as e:
@@ -729,7 +771,9 @@ class MW75WebSocketServer:
                     self.device = None
                     self.packet_processor = None
                 except Exception as cleanup_error:
-                    self.logger.error(f"Error during cleanup after device error: {cleanup_error}")
+                    self.logger.error(
+                        f"Error during cleanup after device error: {cleanup_error}"
+                    )
                     # Still clear references even on error
                     self.device = None
                     self.packet_processor = None
@@ -761,7 +805,9 @@ class MW75WebSocketServer:
                         self.device = None
                         self.packet_processor = None
                     except Exception as cleanup_error:
-                        self.logger.error(f"Error during device cleanup: {cleanup_error}")
+                        self.logger.error(
+                            f"Error during device cleanup: {cleanup_error}"
+                        )
                         # Still clear references even on error
                         self.device = None
                         self.packet_processor = None
@@ -769,6 +815,95 @@ class MW75WebSocketServer:
                 # Start auto-reconnect if enabled
                 if self.auto_reconnect_enabled:
                     await self._start_reconnect_loop()
+
+    async def _mock_device_connection_task(self) -> None:
+        """Background task for mock device connection (simplified flow)"""
+        connection_successful = False
+        mock_rfcomm_manager: Optional[MockRFCOMMManager] = None
+
+        try:
+            # Skip BLE entirely for mock device
+            print("Connecting to mock MW75 device...")
+            self.logger.info("Using mock RFCOMM manager (no BLE required)")
+
+            # Create mock RFCOMM manager
+            mock_rfcomm_manager = MockRFCOMMManager(
+                "MW75-MOCK", self._handle_device_data
+            )
+
+            if not mock_rfcomm_manager.connect():
+                print("Mock RFCOMM connection failed")
+                self.logger.error("Mock RFCOMM connection failed")
+                self.device_state = DeviceState.ERROR
+                await self._broadcast_message(
+                    msg_type="error",
+                    data={
+                        "message": "Mock RFCOMM connection failed",
+                        "code": "MOCK_CONNECTION_FAILED",
+                        "timestamp": time.time(),
+                    },
+                )
+                return
+
+            # Connection successful
+            connection_successful = True
+            self.device_state = DeviceState.CONNECTED
+            await self._send_status(
+                state=DeviceState.CONNECTED.value,
+                message="Successfully connected to mock MW75 device, streaming synthetic EEG data",
+            )
+            print("Successfully connected to mock MW75 device!")
+            print("Streaming synthetic data at ~500Hz...")
+
+            # Start data timeout monitoring
+            self.last_packet_time = None
+            self.data_timeout_task = asyncio.create_task(self._data_timeout_monitor())
+            self.logger.debug("Data timeout monitoring task started")
+
+            # Run mock streaming loop (blocking call runs in thread)
+            self.logger.info("Starting mock data streaming loop...")
+            await asyncio.get_event_loop().run_in_executor(
+                None, mock_rfcomm_manager.run_until_stopped
+            )
+
+        except Exception as e:
+            self.logger.error(f"Mock device connection error: {e}")
+            self.device_state = DeviceState.ERROR
+            await self._broadcast_message(
+                msg_type="error",
+                data={
+                    "message": f"Mock device error: {e}",
+                    "code": "MOCK_DEVICE_ERROR",
+                    "timestamp": time.time(),
+                },
+            )
+
+        finally:
+            # Stop data timeout monitoring
+            if self.data_timeout_task and not self.data_timeout_task.done():
+                await self._cancel_task(self.data_timeout_task)
+                self.data_timeout_task = None
+                self.last_packet_time = None
+                self.logger.debug("Data timeout monitoring task stopped")
+
+            # Clean up mock manager
+            if mock_rfcomm_manager:
+                try:
+                    mock_rfcomm_manager.close()
+                except Exception as cleanup_error:
+                    self.logger.error(f"Error closing mock RFCOMM: {cleanup_error}")
+
+            # Connection ended
+            if connection_successful:
+                print("Mock device streaming ended")
+                self.device_state = DeviceState.DISCONNECTED
+                await self._send_status(
+                    state=DeviceState.DISCONNECTED.value,
+                    message="Mock device connection closed",
+                )
+
+                # Clear packet processor
+                self.packet_processor = None
 
     async def _run_rfcomm_streaming(self) -> None:
         """
@@ -912,7 +1047,7 @@ class MW75WebSocketServer:
             self.logger.error(f"Error processing device data: {e}")
 
     def _handle_eeg_packet(self, packet: EEGPacket) -> None:
-        """Handle processed EEG packet (called from main thread)"""
+        """Handle processed EEG packet (called from worker thread)"""
         if not self.clients:
             return
 
@@ -920,8 +1055,11 @@ class MW75WebSocketServer:
             # Update last packet timestamp for health monitoring
             self.last_packet_time = time.time()
 
-            # Create async task to broadcast EEG data to all clients
-            asyncio.create_task(self._send_eeg_data(packet))
+            # Schedule coroutine to run in the event loop from worker thread
+            if self._loop is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self._send_eeg_data(packet), self._loop
+                )
         except Exception as e:
             self.logger.error(f"Error handling EEG packet: {e}")
 
@@ -973,10 +1111,14 @@ class MW75WebSocketServer:
 
                 # Exit if device state changed
                 if self.device_state != DeviceState.CONNECTED:
-                    self.logger.debug("Data timeout monitor exiting - device not connected")
+                    self.logger.debug(
+                        "Data timeout monitor exiting - device not connected"
+                    )
                     return
 
-            self.logger.debug(f"Data timeout monitoring started (timeout={DATA_PACKET_TIMEOUT}s)")
+            self.logger.debug(
+                f"Data timeout monitoring started (timeout={DATA_PACKET_TIMEOUT}s)"
+            )
 
             # Monitor loop
             while self.device_state == DeviceState.CONNECTED:
@@ -1146,6 +1288,8 @@ class MW75WebSocketServer:
 
     def _get_battery_level(self) -> Optional[int]:
         """Get current battery level from device"""
+        if self.use_mock:
+            return 84
         if self.device and self.device.ble_manager:
             return self.device.ble_manager.battery_level
         return None
@@ -1182,7 +1326,9 @@ class MW75WebSocketServer:
             "counter": packet.counter,
             "ref": packet.ref,
             "drl": packet.drl,
-            "channels": {f"ch{i + 1}": packet.channels[i] for i in range(len(packet.channels))},
+            "channels": {
+                f"ch{i + 1}": packet.channels[i] for i in range(len(packet.channels))
+            },
             "feature_status": packet.feature_status,
         }
 

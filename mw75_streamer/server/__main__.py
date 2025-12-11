@@ -4,12 +4,12 @@ MW75 WebSocket Server CLI Entry Point
 Command-line interface for starting the MW75 WebSocket server.
 """
 
-import asyncio
 import argparse
+import asyncio
 import sys
 from typing import TYPE_CHECKING
 
-from ..utils.logging import setup_logging, get_logger
+from ..utils.logging import get_logger, setup_logging
 
 # Platform check
 if TYPE_CHECKING or sys.platform == "darwin":
@@ -47,9 +47,19 @@ WebSocket Protocol:
         "--port", "-p", type=int, default=8080, help="Port to listen on (default: 8080)"
     )
 
-    parser.add_argument("--host", default="localhost", help="Host to bind to (default: localhost)")
+    parser.add_argument(
+        "--host", default="localhost", help="Host to bind to (default: localhost)"
+    )
 
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
+    )
+
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock MW75 device for development (no hardware required, cross-platform)",
+    )
 
     args = parser.parse_args()
 
@@ -57,15 +67,18 @@ WebSocket Protocol:
     setup_logging(args.verbose, "mw75_server")
     logger = get_logger(__name__)
 
-    # Check platform support
-    if MW75WebSocketServer is None:
+    # Check platform support (skip check if using mock)
+    if not args.mock and MW75WebSocketServer is None:
         logger.error("MW75 WebSocket server is only available on macOS")
         logger.error("Current platform: %s", sys.platform)
+        logger.info(
+            "Tip: Use --mock flag for development with synthetic data"
+        )
         sys.exit(1)
 
     try:
         # Create and start server
-        server = MW75WebSocketServer(host=args.host, port=args.port)
+        server = MW75WebSocketServer(host=args.host, port=args.port, use_mock=args.mock)
         await server.start()
 
     except KeyboardInterrupt:

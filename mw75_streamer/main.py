@@ -4,18 +4,18 @@ MW75 EEG Streamer - Main Entry Point
 Clean main function and CLI interface for the MW75 EEG streamer.
 """
 
-import sys
-import asyncio
 import argparse
-from typing import Optional, List, Any, TYPE_CHECKING, Callable
+import asyncio
+import logging
+import os
+import sys
 import time
 import webbrowser
-import os
-import logging
 from logging import Logger
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
-from .utils.logging import setup_logging, get_logger
 from .data.packet_processor import PacketProcessor
+from .utils.logging import get_logger, setup_logging
 
 # Type checking imports
 if TYPE_CHECKING:
@@ -31,8 +31,11 @@ if sys.platform == "darwin":
     from .device.mw75_device import MW75Device as _MW75Device  # noqa: F401
 else:
     _MW75Device = None
-from .data.streamers import CSVWriter, WebSocketStreamer, StdoutStreamer, LSLStreamer
+
+# Mock device support (cross-platform)
 from .data.packet_processor import EEGPacket
+from .data.streamers import CSVWriter, LSLStreamer, StdoutStreamer, WebSocketStreamer
+from .device.mock_rfcomm_manager import MockRFCOMMManager
 from .panel.panel_server import PanelServer, WebSocketLogHandler
 
 
@@ -52,6 +55,7 @@ class MW75Streamer:
         eeg_callback: Optional[Callable[[EEGPacket], None]] = None,
         raw_data_callback: Optional[Callable[[bytes], None]] = None,
         other_event_callback: Optional[Callable[[bytes], None]] = None,
+        use_mock: bool = False,
     ):
         """
         Initialize MW75 streamer
@@ -66,6 +70,7 @@ class MW75Streamer:
             eeg_callback: Custom callback function for EEG packets (receives EEGPacket objects)
             raw_data_callback: Custom callback function for raw device data (receives bytes)
             other_event_callback: Custom callback function for non-EEG events (receives bytes)
+            use_mock: Use mock device for development (cross-platform)
         """
         # Store custom callbacks
         self.eeg_callback = eeg_callback
@@ -91,7 +96,10 @@ class MW75Streamer:
         else:
             self.stdout_streamer = StdoutStreamer(
                 print_header=(
-                    not csv_file and not websocket_url and not lsl_stream_name and not eeg_callback
+                    not csv_file
+                    and not websocket_url
+                    and not lsl_stream_name
+                    and not eeg_callback
                 )
             )
         self.packet_processor = PacketProcessor(self.verbose or False)
@@ -105,10 +113,19 @@ class MW75Streamer:
         self._rate_times: List[float] = []
         self._last_stats_emit: float = 0.0
 
+        # Store mock flag
+        self.use_mock = use_mock
+        self.mock_rfcomm_manager: Optional[MockRFCOMMManager] = None
+
         # Initialize device with data callback
-        if _MW75Device is None:
-            raise RuntimeError("MW75Device not available on this platform")
-        self.device = _MW75Device(self._handle_device_data)
+        if use_mock:
+            # Mock mode - no device needed, we'll create mock manager directly
+            self.device = None  # type: ignore
+            self.logger.info("Using mock MW75 device (no hardware required)")
+        else:
+            if _MW75Device is None:
+                raise RuntimeError("MW75Device not available on this platform")
+            self.device = _MW75Device(self._handle_device_data)
 
     def set_verbose(self, verbose: bool) -> None:
         """
@@ -196,7 +213,8 @@ class MW75Streamer:
                     "ref": packet.ref,
                     "drl": packet.drl,
                     "channels": {
-                        f"ch{i + 1}": packet.channels[i] for i in range(len(packet.channels))
+                        f"ch{i + 1}": packet.channels[i]
+                        for i in range(len(packet.channels))
                     },
                     "feature_status": packet.feature_status,
                 }
@@ -243,8 +261,12 @@ class MW75Streamer:
         try:
             self.logger.info("MW75 EEG Streamer - Starting...")
 
-            # Connect and stream data
-            success = await self.device.connect_and_stream()
+            if self.use_mock:
+                # Mock mode - create and run mock RFCOMM manager
+                success = await self._start_mock_streaming()
+            else:
+                # Real device mode
+                success = await self.device.connect_and_stream()
 
             return bool(success)
 
@@ -253,6 +275,35 @@ class MW75Streamer:
             return False
         finally:
             await self._cleanup()
+
+    async def _start_mock_streaming(self) -> bool:
+        """Start mock device streaming"""
+        try:
+            self.logger.info("Connecting to mock MW75 device...")
+
+            # Create mock RFCOMM manager
+            self.mock_rfcomm_manager = MockRFCOMMManager(
+                "MW75-MOCK", self._handle_device_data
+            )
+
+            if not self.mock_rfcomm_manager.connect():
+                self.logger.error("Mock RFCOMM connection failed")
+                return False
+
+            self.logger.info(
+                "Mock device connected - streaming synthetic data at ~500Hz"
+            )
+
+            # Run mock streaming loop (blocking call, runs in executor)
+            await asyncio.get_event_loop().run_in_executor(
+                None, self.mock_rfcomm_manager.run_until_stopped
+            )
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Mock streaming error: {e}")
+            return False
 
     async def _cleanup(self) -> None:
         """Clean up all resources"""
@@ -266,6 +317,14 @@ class MW75Streamer:
                 f"{stats.valid_packets} valid ({100 - stats.error_rate:.1f}%), "
                 f"{stats.invalid_packets} invalid ({stats.error_rate:.1f}%)"
             )
+
+        # Clean up mock manager if used
+        if self.mock_rfcomm_manager:
+            try:
+                self.mock_rfcomm_manager.close()
+                self.mock_rfcomm_manager = None
+            except Exception as e:
+                self.logger.error(f"Error closing mock RFCOMM: {e}")
 
         # Close output streams
         self.csv_writer.close()
@@ -317,7 +376,15 @@ Examples:
         help='LSL stream name for Lab Streaming Layer output (e.g., "MW75_EEG")',
     )
 
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose logging"
+    )
+
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock MW75 device for development (no hardware required, cross-platform)",
+    )
 
     # Browser dashboard panel
     parser.add_argument(
@@ -341,7 +408,12 @@ Examples:
     args = parser.parse_args()
 
     # Handle default values and validation
-    if not args.csv_file and not args.websocket and not args.lsl_stream and not args.browser:
+    if (
+        not args.csv_file
+        and not args.websocket
+        and not args.lsl_stream
+        and not args.browser
+    ):
         print(
             "No output specified - streaming EEG data to stdout",
             file=sys.stderr,
@@ -384,10 +456,13 @@ async def main() -> None:
     setup_logging(args.verbose, "mw75_streamer")
     logger = get_logger(__name__)
 
-    # Check if running on supported platform
-    if _MW75Device is None:
+    # Check if running on supported platform (skip check if using mock)
+    if not args.mock and _MW75Device is None:
         logger.error("MW75 device support is only available on macOS")
         logger.error("Current platform: %s", sys.platform)
+        logger.info(
+            "Tip: Use --mock flag for cross-platform development with synthetic data"
+        )
         logger.info(
             "For cross-platform support contributions, see: https://github.com/arctop/mw75-streamer/blob/main/CONTRIBUTING.md"
         )
@@ -418,6 +493,7 @@ async def main() -> None:
         lsl_stream_name=args.lsl_stream,
         panel_server=panel_server,
         verbose=args.verbose,
+        use_mock=args.mock,
     )
 
     # Start panel server and open browser if requested
@@ -439,7 +515,9 @@ async def main() -> None:
             panel_html = os.path.join(os.path.dirname(__file__), "panel", "panel.html")
             webbrowser.open(f"file://{panel_html}")
         except Exception:
-            logger.warning("Failed to open browser automatically. Open panel/panel.html manually.")
+            logger.warning(
+                "Failed to open browser automatically. Open panel/panel.html manually."
+            )
 
     success = await streamer.start_streaming()
 

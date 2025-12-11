@@ -14,6 +14,7 @@ Stream 12-channel EEG data from MW75 Neuro headphones with WebSocket, CSV, and L
 
 - **Real-time streaming**: 500Hz, 12-channel EEG with µV precision
 - **Multiple outputs**: WebSocket JSON, CSV files, Lab Streaming Layer (LSL)
+- **Mock device mode**: Cross-platform development without physical hardware
 - **Built-in testing**: WebSocket servers with browser visualization
 - **Robust protocol**: Checksum validation and error detection  
 
@@ -60,6 +61,10 @@ uv run -m mw75_streamer --lsl MW75_EEG
 # Combined outputs
 uv run -m mw75_streamer --csv eeg.csv --ws ws://localhost:8080
 
+# Mock device mode (development without hardware)
+uv run -m mw75_streamer --mock --csv eeg.csv
+uv run -m mw75_streamer.server --mock
+
 # WebSocket Server (remote control mode)
 uv run -m mw75_streamer.server --port 8080
 ```
@@ -91,6 +96,29 @@ await streamer.start_streaming()
 
 See [examples/README.md](examples/README.md) for complete documentation.
 
+## Mock Device Mode
+
+Develop and test without physical MW75 hardware using the built-in mock device:
+
+```bash
+# Stream synthetic data to CSV
+uv run -m mw75_streamer --mock --csv eeg.csv
+
+# WebSocket server with mock device
+uv run -m mw75_streamer.server --mock
+
+# Test with visualization
+uv run -m mw75_streamer.testing --advanced  # Terminal 1
+uv run -m mw75_streamer --mock --ws ws://localhost:8080  # Terminal 2
+```
+
+**Features:**
+- Generates valid 63-byte EEG packets with correct checksums
+- Streams at ~500Hz with realistic random data (-200 to +200 µV)
+- Works cross-platform (Linux, Windows, macOS)
+- Perfect for development, testing, and CI/CD pipelines
+- No hardware or Bluetooth required
+
 ## Testing
 
 ```bash
@@ -98,8 +126,9 @@ See [examples/README.md](examples/README.md) for complete documentation.
 uv run -m mw75_streamer.testing --advanced
 # Optional: Press 'b' + Enter in server terminal to open browser visualization
 
-# 2. Start EEG streaming
+# 2. Start EEG streaming (with real or mock device)
 uv run -m mw75_streamer --ws ws://localhost:8080
+uv run -m mw75_streamer --mock --ws ws://localhost:8080  # Mock version
 ```
 
 ## WebSocket Server (Remote Control Mode)
@@ -137,8 +166,8 @@ For complete protocol documentation and examples, see the [WebSocket Server docu
 
 ## Requirements
 
-- **Hardware**: MW75 Neuro headphones (paired via Bluetooth)
-- **OS**: macOS (fully supported), Linux (planned - [contributions welcome](CONTRIBUTING.md))
+- **Hardware**: MW75 Neuro headphones (paired via Bluetooth) - *not required for mock mode*
+- **OS**: macOS (fully supported for real device), Linux/Windows (mock mode only - [contributions welcome](CONTRIBUTING.md))
 - **Python**: 3.9+
 
 ## macOS Setup for LSL
