@@ -7,11 +7,11 @@ Coordinates BLE activation and RFCOMM data streaming.
 
 import asyncio
 import signal
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Optional
 
+from ..utils.logging import get_logger
 from .ble_manager import BLEManager
 from .rfcomm_manager import RFCOMMManager
-from ..utils.logging import get_logger
 
 
 class MW75Device:
@@ -35,6 +35,7 @@ class MW75Device:
         self.data_callback = data_callback
         self.ble_manager = BLEManager()
         self.rfcomm_manager: Optional[RFCOMMManager] = None
+        self.device_address: Optional[str] = None
         self.should_stop = False
         self.logger = get_logger(__name__)
 
@@ -78,6 +79,9 @@ class MW75Device:
             if not self.rfcomm_manager.connect():
                 self.logger.error("RFCOMM connection failed")
                 return False
+
+            # Store device address from RFCOMM manager
+            self.device_address = self.rfcomm_manager.device_address
 
             # Step 3: Start data streaming loop
             self.logger.info("Starting data streaming loop...")

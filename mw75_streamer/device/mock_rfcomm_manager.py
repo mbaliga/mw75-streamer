@@ -88,6 +88,7 @@ class MockRFCOMMManager:
         self.connected = False
         self.should_stop = False
         self.counter = 0
+        self.device_address = "00:00:00:00:00:00"
         self.streaming_thread: Optional[threading.Thread] = None
         self.logger = get_logger(__name__)
 

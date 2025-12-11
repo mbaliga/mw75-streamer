@@ -4,10 +4,11 @@ RFCOMM Manager for MW75 EEG Streamer
 Handles Bluetooth RFCOMM connection and data streaming using macOS IOBluetooth framework.
 """
 
-import objc
 import os
-from typing import Optional, Callable, Any
-from Foundation import NSObject, NSRunLoop, NSDate
+from typing import Any, Callable, Optional
+
+import objc
+from Foundation import NSDate, NSObject, NSRunLoop
 from IOBluetooth import IOBluetoothDevice
 
 from ..config import RFCOMM_CHANNEL, RFCOMM_CONNECTION_TIMEOUT
@@ -80,6 +81,7 @@ class RFCOMMManager:
         self.delegate: Optional[RFCOMMDelegate] = None
         self.connected = False
         self.should_stop = False
+        self.device_address: Optional[str] = None
         self.logger = get_logger(__name__)
 
     def connect(self) -> bool:
@@ -113,15 +115,15 @@ class RFCOMMManager:
             self.logger.info(f"Found {len(paired_devices)} paired Bluetooth devices")
             for device in paired_devices:
                 device_name = device.name()
+                device_address = device.addressString()
+                self.logger.debug(f"   - {device_name or 'Unknown'} ({device_address})")
                 if device_name and self.device_name.upper() in device_name.upper():
                     target_device = device
-                    device_address = device.addressString()
+                    self.device_address = device_address
                     self.logger.info(
                         f"Found matching paired device: {device_name} ({device_address})"
                     )
                     break
-                else:
-                    self.logger.debug(f"   - {device_name or 'Unknown'} (not a match)")
 
         if not target_device:
             self.logger.error(f"No paired device found matching '{self.device_name}'")

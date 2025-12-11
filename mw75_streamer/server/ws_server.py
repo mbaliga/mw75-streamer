@@ -129,6 +129,7 @@ class MW75WebSocketServer:
         # Device management
         self.device: Optional[MW75Device] = None
         self.device_state = DeviceState.IDLE
+        self.device_address: Optional[str] = None
         self.packet_processor: Optional[PacketProcessor] = None
 
         # Auto-reconnect
@@ -214,6 +215,7 @@ class MW75WebSocketServer:
                     "message": "Client connected to MW75 server",
                     "timestamp": time.time(),
                     "battery_level": self._get_battery_level(),
+                    "device_address": self.device_address,
                 },
             )
 
@@ -290,6 +292,7 @@ class MW75WebSocketServer:
                             "message": "Device control released - available for new controller",
                             "timestamp": time.time(),
                             "battery_level": self._get_battery_level(),
+                            "device_address": self.device_address,
                         },
                     )
 
@@ -325,6 +328,7 @@ class MW75WebSocketServer:
                         self.logger.error(f"Error during fallback device cleanup: {e}")
                     self.device = None
                     self.packet_processor = None
+                    self.device_address = None
                     self.device_state = DeviceState.IDLE
 
                 # Remove logging handler
@@ -542,6 +546,7 @@ class MW75WebSocketServer:
                     "message": "No active device connection",
                     "timestamp": time.time(),
                     "battery_level": self._get_battery_level(),
+                    "device_address": self.device_address,
                 },
             )
 
@@ -557,6 +562,7 @@ class MW75WebSocketServer:
             "auto_reconnect": self.auto_reconnect_enabled,
             "log_level": self.client_log_level or "ERROR",
             "battery_level": self._get_battery_level(),
+            "device_address": self.device_address,
             "has_control": (websocket == self.controlling_client),
             "total_clients": len(self.clients),
         }
@@ -715,11 +721,13 @@ class MW75WebSocketServer:
             # Connection successful - update state and notify
             connection_successful = True
             self.device_state = DeviceState.CONNECTED
+            # Get device address from RFCOMM manager
+            self.device_address = self.device.rfcomm_manager.device_address
             await self._send_status(
                 state=DeviceState.CONNECTED.value,
                 message="Successfully connected to MW75 device, streaming EEG data",
             )
-            print("Successfully connected to MW75 device!")
+            print(f"Successfully connected to MW75 device! (MAC: {self.device_address})")
             print("Streaming..")
 
             # Start data timeout monitoring
@@ -750,11 +758,13 @@ class MW75WebSocketServer:
                     await self.device.cleanup()
                     self.device = None
                     self.packet_processor = None
+                    self.device_address = None
                 except Exception as cleanup_error:
                     self.logger.error(f"Error during cleanup after device error: {cleanup_error}")
                     # Still clear references even on error
                     self.device = None
                     self.packet_processor = None
+                    self.device_address = None
 
             # Start auto-reconnect if enabled
             if self.auto_reconnect_enabled:
@@ -782,11 +792,13 @@ class MW75WebSocketServer:
                         await self.device.cleanup()
                         self.device = None
                         self.packet_processor = None
+                        self.device_address = None
                     except Exception as cleanup_error:
                         self.logger.error(f"Error during device cleanup: {cleanup_error}")
                         # Still clear references even on error
                         self.device = None
                         self.packet_processor = None
+                        self.device_address = None
 
                 # Start auto-reconnect if enabled
                 if self.auto_reconnect_enabled:
@@ -822,6 +834,7 @@ class MW75WebSocketServer:
             # Connection successful
             connection_successful = True
             self.device_state = DeviceState.CONNECTED
+            self.device_address = mock_rfcomm_manager.device_address
             await self._send_status(
                 state=DeviceState.CONNECTED.value,
                 message="Successfully connected to mock MW75 device, streaming synthetic EEG data",
@@ -876,8 +889,9 @@ class MW75WebSocketServer:
                     message="Mock device connection closed",
                 )
 
-                # Clear packet processor
+                # Clear packet processor and device address
                 self.packet_processor = None
+                self.device_address = None
 
     async def _run_rfcomm_streaming(self) -> None:
         """
@@ -922,6 +936,7 @@ class MW75WebSocketServer:
             await self.device.cleanup()
             self.device = None
             self.packet_processor = None
+            self.device_address = None
 
             self.device_state = DeviceState.IDLE
             await self._send_status(
@@ -1051,13 +1066,14 @@ class MW75WebSocketServer:
                 await asyncio.sleep(self.heartbeat_interval)
 
                 # Send heartbeat ping to this specific client
-                # Include battery level for periodic updates
+                # Include battery level and device address for periodic updates
                 await self._send_to_client(
                     websocket,
                     msg_type="heartbeat",
                     data={
                         "timestamp": time.time(),
                         "battery_level": self._get_battery_level(),
+                        "device_address": self.device_address,
                     },
                 )
 
@@ -1165,6 +1181,7 @@ class MW75WebSocketServer:
                 finally:
                     self.device = None
                     self.packet_processor = None
+                    self.device_address = None
                     self.last_packet_time = None
 
             self.device_state = DeviceState.DISCONNECTED
@@ -1271,6 +1288,7 @@ class MW75WebSocketServer:
                 "message": message,
                 "timestamp": time.time(),
                 "battery_level": self._get_battery_level(),
+                "device_address": self.device_address,
             },
         )
 
