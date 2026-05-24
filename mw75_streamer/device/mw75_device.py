@@ -11,7 +11,7 @@ from typing import Any, Callable, Optional
 
 from ..utils.logging import get_logger
 from .ble_manager import BLEManager
-from .rfcomm_manager import RFCOMMManager
+from .rfcomm_backend import RFCOMMManagerProtocol, create_rfcomm_manager
 
 
 class MW75Device:
@@ -34,7 +34,7 @@ class MW75Device:
         """
         self.data_callback = data_callback
         self.ble_manager = BLEManager()
-        self.rfcomm_manager: Optional[RFCOMMManager] = None
+        self.rfcomm_manager: Optional[RFCOMMManagerProtocol] = None
         self.device_address: Optional[str] = None
         self.should_stop = False
         self.logger = get_logger(__name__)
@@ -73,9 +73,9 @@ class MW75Device:
             # Wait for Bluetooth stack to settle after BLE disconnection
             await asyncio.sleep(0.5)
 
-            # Step 2: RFCOMM connection
+            # Step 2: RFCOMM connection (platform backend selected lazily)
             self.logger.info("Establishing RFCOMM connection...")
-            self.rfcomm_manager = RFCOMMManager(device_name, self.data_callback)
+            self.rfcomm_manager = create_rfcomm_manager(device_name, self.data_callback)
             if not self.rfcomm_manager.connect():
                 self.logger.error("RFCOMM connection failed")
                 return False
