@@ -106,7 +106,12 @@ class LinuxRFCOMMManager:
         self.logger.info(f"Connecting RFCOMM to {self.device_name} ({address}) ...")
         sock: Optional[socket.socket] = None
         try:
-            sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
+            # AF_BLUETOOTH / BTPROTO_RFCOMM are Linux-only and not present in
+            # every typeshed version; access them dynamically (guarded above by
+            # the hasattr check in connect()).
+            af_bluetooth = getattr(socket, "AF_BLUETOOTH")
+            btproto_rfcomm = getattr(socket, "BTPROTO_RFCOMM")
+            sock = socket.socket(af_bluetooth, socket.SOCK_STREAM, btproto_rfcomm)
             sock.settimeout(RFCOMM_CONNECTION_TIMEOUT)
             sock.connect((address, RFCOMM_CHANNEL))
             # Switch to a short read timeout so the loop can poll the stop flag.
