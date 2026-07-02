@@ -8,6 +8,16 @@ Stream 12-channel EEG data from MW75 Neuro headphones with WebSocket, CSV, and L
 
 📖 **[Full Documentation & API Reference](https://arctop.github.io/mw75-streamer/api/)**
 
+> **Constellation status** (see [`Personal-Tracker/CONSTELLATION.md`](https://github.com/mbaliga/Personal-Tracker/blob/main/CONSTELLATION.md)) ·
+> `state: dormant` (not dead) — canonical, upstreamable.
+> This `mbaliga/mw75-streamer` fork is the **canonical MW75 EEG streamer** for the constellation:
+> the biosignal cluster (`baseline`, `Form-analyser`'s paid EEG add-on) depends on it. **Do not
+> re-implement packet parsing elsewhere** — keep changes here and **upstreamable to
+> [`arctop/mw75-streamer`](https://github.com/arctop/mw75-streamer)**.
+> `main` is **macOS-only** (v1.0.8 beta). A **Linux port** (stdlib `AF_BLUETOOTH` RFCOMM + BlueZ)
+> exists on the open **PR #1** and is planned to land under **`baseline` Phase 1** (fork + port,
+> then contribute back upstream). Windows is still unimplemented.
+
 **About `uv`:** This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable Python package management. Benefits include faster installs, better dependency resolution, and reproducible environments. All commands can be run with regular Python too (see [Alternative: Using Python Directly](#alternative-using-python-directly)), but we use `uv` throughout this documentation for consistency.
 
 ## Features
