@@ -34,7 +34,64 @@ stack is never imported on Linux (and vice versa).
   ```
 - BlueZ command-line tools (`bluetoothctl`) for pairing.
 
-Tested deployment targets: Steam Deck (Arch) and a Debian homelab server.
+Target platforms: Steam Deck (Arch), a Debian homelab server, and **Raspberry Pi**
+(Raspberry Pi OS) — see [Raspberry Pi](#raspberry-pi) below. The backend is pure
+standard-library `AF_BLUETOOTH` RFCOMM + BlueZ, with no architecture-specific
+code, so the same path runs on x86-64 and ARM (aarch64/armhf) alike.
+
+## Raspberry Pi
+
+The Raspberry Pi is a first-class target — a headless Pi makes a natural always-on
+host that streams the MW75 and forwards EEG (WebSocket/LSL) to whatever consumes it.
+Nothing Pi-specific is needed in code; the notes below are just setup.
+
+- **Hardware.** A Pi with onboard Bluetooth (Pi 3/4/5, Zero 2 W) or a USB BT
+  dongle — it must support **BR/EDR (Bluetooth Classic)**, not BLE-only, because
+  RFCOMM rides on Classic. The onboard controllers on Pi 3/4/5 do.
+- **OS / Python.** Raspberry Pi OS (Bookworm ships Python 3.11; Bullseye 3.9) —
+  both meet the 3.9+ floor. 64-bit is recommended but not required.
+- **Enable Bluetooth (headless):**
+  ```bash
+  sudo rfkill unblock bluetooth
+  sudo systemctl enable --now bluetooth
+  bluetoothctl show      # expect "Powered: yes" and BR/EDR (not LE-only)
+  ```
+- **Permissions.** So the streamer can reach BlueZ on the system D-Bus without
+  root, add your user to the `bluetooth` group once, then re-login:
+  ```bash
+  sudo usermod -aG bluetooth "$USER"
+  ```
+- **Pair over SSH.** Pairing is the same `bluetoothctl` flow as above — no display
+  needed; run it over SSH.
+- **Pin the address for boot/kiosk.** On a headless Pi, skip name lookup by
+  exporting the Classic address (e.g. in the systemd unit below):
+  ```bash
+  export MW75_BT_ADDR=AA:BB:CC:DD:EE:FF
+  ```
+- **Autostart (optional).** A minimal user/system service:
+  ```ini
+  # /etc/systemd/system/mw75.service
+  [Unit]
+  Description=MW75 EEG streamer
+  After=bluetooth.target
+  Wants=bluetooth.target
+
+  [Service]
+  Environment=MW75_BT_ADDR=AA:BB:CC:DD:EE:FF
+  ExecStart=/home/pi/.venv/bin/mw75-streamer --websocket ws://localhost:8080
+  Restart=on-failure
+  User=pi
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+  ```bash
+  sudo systemctl enable --now mw75.service
+  ```
+
+> 500 Hz × 12 channels is a light load — even a Pi Zero 2 W handles it. On-device
+> verification (BLE activation + a clean multi-minute RFCOMM stream on a real Pi +
+> MW75) is still pending, same as the other Linux targets.
 
 ## Install
 
