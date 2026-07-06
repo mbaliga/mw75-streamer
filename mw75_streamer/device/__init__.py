@@ -23,3 +23,7 @@ elif sys.platform == "linux":
     from .rfcomm_manager_linux import LinuxRFCOMMManager  # noqa: F401
 
     __all__ += ["LinuxRFCOMMManager"]
+elif sys.platform == "win32":
+    from .rfcomm_manager_windows import WindowsRFCOMMManager  # noqa: F401
+
+    __all__ += ["WindowsRFCOMMManager"]

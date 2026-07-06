@@ -140,8 +140,66 @@ jobs:
         uv run mw75-test-server --help
         uv run python -m mw75_streamer.server --help
 
+  windows-compatibility:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Install dependencies and verify Windows real-device wiring
+      run: |
+        uv venv
+        uv pip install -e ".[dev]"
+        uv run python -c "
+        import sys
+        print(f'Testing imports on platform: {sys.platform}')
+
+        import mw75_streamer
+        print('Basic import test passed')
+
+        print(f'MW75Device: {mw75_streamer.MW75Device}')
+        print(f'BLEManager: {mw75_streamer.BLEManager}')
+        print(f'RFCOMMManager (macOS-only): {mw75_streamer.RFCOMMManager}')
+
+        # Windows is a supported real-device platform: MW75Device/BLEManager must
+        # be importable, the factory must select the Windows RFCOMM backend, and
+        # neither the macOS (PyObjC) nor Linux (dbus_fast) stacks may be imported.
+        if sys.platform == 'win32':
+            assert mw75_streamer.MW75Device is not None, 'MW75Device should be available on Windows'
+            assert mw75_streamer.BLEManager is not None, 'BLEManager should be available on Windows'
+            assert mw75_streamer.RFCOMMManager is None, 'macOS RFCOMMManager should be None on Windows'
+
+            from mw75_streamer.device.rfcomm_backend import create_rfcomm_manager
+            from mw75_streamer.device.rfcomm_manager_windows import WindowsRFCOMMManager
+            mgr = create_rfcomm_manager('MW75', lambda data: None)
+            assert isinstance(mgr, WindowsRFCOMMManager), 'factory must return WindowsRFCOMMManager on Windows'
+
+            # Address normalisation is a pure function; verify it parenthesises.
+            assert mgr._to_bth_address('AA:BB:CC:DD:EE:FF') == '(AA:BB:CC:DD:EE:FF)'
+            assert mgr._to_bth_address('(AA:BB:CC:DD:EE:FF)') == '(AA:BB:CC:DD:EE:FF)'
+
+            for mod in ('objc', 'Foundation', 'IOBluetooth', 'dbus_fast'):
+                assert mod not in sys.modules, f'{mod} must not be imported on Windows'
+            print('Windows real-device support verified (no PyObjC / dbus_fast imported)')
+        "
+
+    - name: Test CLI entry points on Windows
+      run: |
+        uv run mw75-streamer --help
+        uv run mw75-test-server --help
+        uv run python -m mw75_streamer.server --help
+
   build-and-publish:
-    needs: [code-quality, macos-compatibility]
+    needs: [code-quality, macos-compatibility, windows-compatibility]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:

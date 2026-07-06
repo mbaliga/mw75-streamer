@@ -27,9 +27,9 @@ if TYPE_CHECKING:
         MW75Device = Any  # type: ignore
 
 # Runtime platform detection. MW75Device is now importable on any platform with
-# a real-device RFCOMM backend (macOS, Linux); the backend is selected lazily so
-# no platform-specific dependency is imported on the wrong OS.
-if sys.platform in ("darwin", "linux"):
+# a real-device RFCOMM backend (macOS, Linux, Windows); the backend is selected
+# lazily so no platform-specific dependency is imported on the wrong OS.
+if sys.platform in ("darwin", "linux", "win32"):
     from .device.mw75_device import MW75Device as _MW75Device  # noqa: F401
 else:
     _MW75Device = None  # type: ignore[assignment, misc]
@@ -445,7 +445,7 @@ async def main() -> None:
 
     # Check if running on supported platform (skip check if using mock)
     if not args.mock and _MW75Device is None:
-        logger.error("MW75 real-device support is only available on macOS and Linux")
+        logger.error("MW75 real-device support is only available on macOS, Linux and Windows")
         logger.error("Current platform: %s", sys.platform)
         logger.info("Tip: Use --mock flag for cross-platform development with synthetic data")
         logger.info(

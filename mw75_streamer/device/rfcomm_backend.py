@@ -4,11 +4,13 @@ RFCOMM backend factory for the MW75 EEG Streamer.
 Selects the platform-appropriate RFCOMM manager implementation at runtime and
 imports it lazily, so platform-specific dependencies are only imported on the
 platform that actually uses them (PyObjC/IOBluetooth on macOS, BlueZ/dbus-fast
-on Linux). This keeps ``mw75_device`` importable on every platform.
+on Linux, Winsock AF_BTH on Windows). This keeps ``mw75_device`` importable on
+every platform.
 
 All RFCOMM manager implementations share the structural interface described by
 ``RFCOMMManagerProtocol``: the macOS ``RFCOMMManager``, the Linux
-``LinuxRFCOMMManager`` and the cross-platform ``MockRFCOMMManager``.
+``LinuxRFCOMMManager``, the Windows ``WindowsRFCOMMManager`` and the
+cross-platform ``MockRFCOMMManager``.
 """
 
 import sys
@@ -64,8 +66,13 @@ def create_rfcomm_manager(
 
         return LinuxRFCOMMManager(device_name, data_callback)
 
+    if sys.platform == "win32":
+        from .rfcomm_manager_windows import WindowsRFCOMMManager
+
+        return WindowsRFCOMMManager(device_name, data_callback)
+
     raise RuntimeError(
         f"No RFCOMM backend available for platform '{sys.platform}'. "
-        "Real-device streaming is supported on macOS and Linux; "
+        "Real-device streaming is supported on macOS, Linux and Windows; "
         "use --mock for cross-platform development."
     )

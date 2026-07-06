@@ -19,9 +19,9 @@ import sys
 from .data.packet_processor import ChecksumStats, EEGPacket, PacketProcessor
 from .data.streamers import CSVWriter, StdoutStreamer, WebSocketStreamer
 
-# BLEManager and MW75Device are cross-platform (real-device support on macOS and
-# Linux). The macOS-specific RFCOMMManager remains gated on Darwin; on other
-# platforms the RFCOMM backend is selected via device.create_rfcomm_manager.
+# BLEManager and MW75Device are cross-platform (real-device support on macOS,
+# Linux and Windows). The macOS-specific RFCOMMManager remains gated on Darwin;
+# on other platforms the RFCOMM backend is selected via device.create_rfcomm_manager.
 from .device.ble_manager import BLEManager  # noqa: F401
 from .device.mw75_device import MW75Device  # noqa: F401
 
