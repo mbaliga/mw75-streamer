@@ -14,20 +14,20 @@ __maintainer__ = "Arctop"
 __company__ = "Arctop"
 
 # Import main classes for easy access
-# Import device classes conditionally (macOS only)
 import sys
 
 from .data.packet_processor import ChecksumStats, EEGPacket, PacketProcessor
 from .data.streamers import CSVWriter, StdoutStreamer, WebSocketStreamer
 
+# BLEManager and MW75Device are cross-platform (real-device support on macOS and
+# Linux). The macOS-specific RFCOMMManager remains gated on Darwin; on other
+# platforms the RFCOMM backend is selected via device.create_rfcomm_manager.
+from .device.ble_manager import BLEManager  # noqa: F401
+from .device.mw75_device import MW75Device  # noqa: F401
+
 if sys.platform == "darwin":
-    from .device.ble_manager import BLEManager  # noqa: F401
-    from .device.mw75_device import MW75Device  # noqa: F401
     from .device.rfcomm_manager import RFCOMMManager  # noqa: F401
 else:
-    # On non-macOS platforms, these will be None
-    MW75Device = None
-    BLEManager = None
     RFCOMMManager = None
 
 # Import LSL conditionally
