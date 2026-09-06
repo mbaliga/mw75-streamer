@@ -19,6 +19,8 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -33,6 +35,10 @@ dependencies = [
     "bleak>=0.20.0",
     "pyobjc>=9.0; sys_platform == 'darwin'",
     "pyobjc-framework-IOBluetooth>=9.0; sys_platform == 'darwin'",
+    # Linux: resolve the paired device's Classic address from BlueZ over D-Bus.
+    # Also installed transitively by bleak on Linux; declared explicitly because
+    # the Linux RFCOMM backend imports it directly.
+    "dbus-fast>=1.83.0; sys_platform == 'linux'",
 ]
 
 [project.optional-dependencies]
