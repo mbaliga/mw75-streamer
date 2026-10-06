@@ -44,35 +44,51 @@ jobs:
       run: |
         uv run mypy mw75_streamer/ --ignore-missing-imports --disable-error-code=unreachable
 
-    - name: Test package imports on Linux (device modules should be None)
+    - name: Test package imports on Linux (real-device support enabled)
       run: |
         uv run python -c "
         import sys
         print(f'Testing imports on platform: {sys.platform}')
-        
+
         import mw75_streamer
-        print('✓ Basic import test passed')
-        
-        # Test that device classes are None on Linux
-        print(f'MW75Device: {mw75_streamer.MW75Device}')
-        print(f'BLEManager: {mw75_streamer.BLEManager}')  
-        print(f'RFCOMMManager: {mw75_streamer.RFCOMMManager}')
-        
-        if sys.platform != 'darwin':
-            assert mw75_streamer.MW75Device is None, 'MW75Device should be None on non-macOS'
-            assert mw75_streamer.BLEManager is None, 'BLEManager should be None on non-macOS'
-            assert mw75_streamer.RFCOMMManager is None, 'RFCOMMManager should be None on non-macOS'
-            print('✓ Device classes properly None on Linux')
-        
-        # Test cross-platform modules
+        print('Basic import test passed')
+
+        # Cross-platform modules
         import mw75_streamer.main
-        import mw75_streamer.data  
+        import mw75_streamer.data
         import mw75_streamer.testing
         import mw75_streamer.utils
         import mw75_streamer.panel
         import mw75_streamer.server
-        print('✓ Cross-platform module imports passed')
+        print('Cross-platform module imports passed')
+
+        print(f'MW75Device: {mw75_streamer.MW75Device}')
+        print(f'BLEManager: {mw75_streamer.BLEManager}')
+        print(f'RFCOMMManager (macOS-only): {mw75_streamer.RFCOMMManager}')
+
+        # Linux is a supported real-device platform: the coordinator and BLE
+        # manager must be importable, and the Linux RFCOMM backend must be
+        # selectable without importing the macOS PyObjC stack.
+        if sys.platform == 'linux':
+            assert mw75_streamer.MW75Device is not None, 'MW75Device should be available on Linux'
+            assert mw75_streamer.BLEManager is not None, 'BLEManager should be available on Linux'
+            assert mw75_streamer.RFCOMMManager is None, 'macOS RFCOMMManager should be None on Linux'
+
+            from mw75_streamer.device.rfcomm_backend import create_rfcomm_manager
+            from mw75_streamer.device.rfcomm_manager_linux import LinuxRFCOMMManager
+            mgr = create_rfcomm_manager('MW75', lambda data: None)
+            assert isinstance(mgr, LinuxRFCOMMManager), 'factory must return LinuxRFCOMMManager on Linux'
+
+            for mod in ('objc', 'Foundation', 'IOBluetooth'):
+                assert mod not in sys.modules, f'{mod} must not be imported on Linux'
+            print('Linux real-device support verified (no PyObjC imported)')
         "
+
+    - name: Test CLI entry points on Linux
+      run: |
+        uv run mw75-streamer --help
+        uv run mw75-test-server --help
+        uv run python -m mw75_streamer.server --help
 
   macos-compatibility:
     runs-on: macos-latest
