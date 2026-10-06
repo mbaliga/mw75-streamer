@@ -2,4 +2,5 @@
 bleak>=0.20.0          # Cross-platform BLE library
 pyobjc>=9.0; sys_platform == "darwin"            # macOS Objective-C bridge (for Bluetooth)
 pyobjc-framework-IOBluetooth>=9.0; sys_platform == "darwin"  # macOS Bluetooth framework access
+dbus-fast>=1.83.0; sys_platform == "linux"       # Linux BlueZ D-Bus access (paired-device lookup)
 websocket-client>=1.6.0  # WebSocket client for real-time streaming
