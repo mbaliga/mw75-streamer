@@ -340,3 +340,51 @@ This is a Python repo outside the Kotlin and Hyle waves, so it consumes little o
   `Personal-Tracker/CONSTELLATION.md`, `DECISIONS.md` (2026-07-06), `STATE.md`, `Form-analyser/docs/architecture.md`,
   `asystemofcells/packages/roster/roster.public.json`, and `Personal-Tracker/PORTING_PROGRAM.md` (§0–§3, §4,
   this repo's §5 row, §6, §7, §8).
+
+## Owner rulings and the proposed line (added 2026-10-07)
+
+Status: PLAN. Nothing here is built, run on a device, signed or submitted. The program-level plan is Personal-Tracker `PORTING_PROGRAM.md` ([PR #10](https://github.com/mbaliga/Personal-Tracker/pull/10)), which holds the owner's rulings and section 5A, the proposed port / no-port line. The cells, estimates and open questions above are this repo's original plan and are unedited. Where the owner has since answered a question, the answer is below. Section 5A is a proposal; the owner has not yet confirmed it.
+
+### Where mw75-streamer sits in the proposed line (program section 5A.3, a proposal)
+
+| Target       | Verdict    | Weeks and flags |
+| ------------ | ---------- | --------------- |
+| Ubuntu Touch | owner-call | 4w g            |
+| Linux        | port       | 1.5w            |
+| iOS/iPadOS   | no-port    | -               |
+| macOS        | exists     | 0.2w            |
+| Windows      | port       | 2w              |
+
+Key: `follows` means it ports only as far as the products that depend on it; `exists` means the program reads it as already running there, unverified (finish, verify and sign); `owner-call` means a genuine toss-up that the owner decides, with the program's lean in section 5A.4; flags: `g` gated on a prerequisite, `r` re-estimate or floor, `o` its own program, `s` scope note. The program's P4, P8, P12 and P13 gate whole columns or repos and are not flagged per cell. A port verdict counts the deliverable in the line; where this repo's plan calls a deliverable a reframe (program rule R12) it keeps that label. Tests cited in the reason: (a) the owner said it is needed there; (b) its job is really done on that OS by real users; (c) that OS is where it is sold or its audience is; it has no reason to exist if (x) its surface is absent or untouchable, (y) the capability is forbidden or impossible, or (z) the only form is a thin wrapper or a different product nobody asked for. P-numbers and OQ-numbers refer to the program plan (Personal-Tracker `PORTING_PROGRAM.md`, sections 5A.5 and 8).
+
+Reason: A sidecar that reads EEG over RFCOMM (PT:D-S, the owner's EEG-stack decision): Linux and Windows are ports, macOS exists, iOS is impossible. UT is a call with no lean until you say whether you want it (clause a): the program's own UT brief says a confined click with the reserved bluetooth group can do it foreground-only, but a pocket capture click is a different product from the headless streamer (z), and it needs you to own the MW75. The 4 weeks are this plan's shape (b), on-phone capture; its recommended shape (a), a phone as a WebSocket client of the Linux build, would be Ebbflow's click and costs 0 weeks here; the program line has Ebbflow's Ubuntu Touch cell as no-port (its LAN viewer is the substitute the Ubuntu Touch scope ruling excludes), so shape (a) is not counted in the line.
+
+### Owner rulings that apply here
+
+- **Ubuntu Touch device:** the owner owns one and says it is a OnePlus 6; research reads it as 20.04-only while the program plan targets 24.04. On 2026-10-07 the owner chose "OnePlus 6 pre-spike now, decide later" (OQ-37): a labelled "S-UT1 (focal)" headless-JVM pre-spike, no 24.04 flashing, a 24.04 device decision afterwards. Every Ubuntu Touch device gate stays NDV until then. The pre-spike tests a headless JVM and does not exercise this repo's shape (Python plus QML).
+- **OQ-31 Mac (2026-10-06 and 2026-10-07):** "Buy a Mac", and on 2026-10-07 an Apple-silicon Mac mini, not yet bought. mw75-streamer has no iOS port and its macOS cell is a pip-installed CLI with no store listing, so only the Mac statement applies. The macOS re-verification stays NOV until the Mac exists.
+- **OQ-20 CI (2026-10-06):** "Linux-only CI when private (Recommended)": this repo is public, so the ruling does not limit its macOS and Windows lanes; going private would stop them. Actions artifact storage is still exhausted (program rule R6). Each added matrix job uploads nothing (this plan, question 11).
+- **OQ-5 hardware (2026-10-06):** the owner's answer changes which of their other machines can serve as device gates, so a gate this plan names on specific hardware may be moved or dropped. Which machine carries which device gate is not decided (OQ-33).
+- **Repo-specific:** this fork has an MIT LICENSE inherited from arctop; the gap OQ-12 names is Ebbflow's.
+- **Directives (2026-10-06):** "Draft amendments for approval": program directives I-1 to I-12 and rules R1 to R12 are unchanged; PROPOSED-1 to PROPOSED-4 in Personal-Tracker `DECISIONS.md` are drafts awaiting the owner.
+
+### Prerequisites and open questions that touch this repo (program sections 5A.5 and 8)
+
+Prerequisites (program-level; not costed here):
+
+- program P4: A device that can run the 24.04 Ubuntu Touch the program plan targets (the owner's OnePlus 6 is read as 20.04-only)
+- program P8: An Apple-silicon Mac (OQ-31: a Mac mini chosen on 2026-10-07, not yet bought); here it matters only for the owner re-verification on macOS 26 (plan step M2, NOV)
+- program P15: A 0.5-week RFCOMM spike on a device
+
+Owner questions in the program register that concern this repo (status as of 2026-10-07):
+
+- OQ-5 (ruled): Hardware stance
+- OQ-12 (open): Licences for repos without a LICENSE
+- OQ-13 (open): mw75-streamer: merge strategy for PRs #1 and #3
+- OQ-20 (ruled): CI minutes, storage and repo visibility
+- OQ-23 (open): EEG canonical transport layer per OS (D-S: the streamer layer lives in mw75-streamer)
+- OQ-31 (ruled): CI for App Store builds; which Mac
+- OQ-33 (open): Hardware details still open
+- OQ-37 (answered in part): A second Ubuntu Touch device
+
+When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A change.
