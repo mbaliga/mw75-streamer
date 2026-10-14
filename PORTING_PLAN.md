@@ -388,3 +388,29 @@ Owner questions in the program register that concern this repo (status as of 202
 - OQ-37 (answered in part): A second Ubuntu Touch device
 
 When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A change.
+
+## Update 2026-10-14: the market lens, iPadOS and the owner's latest answers
+
+Status: PLAN. Nothing here is built, run on a device, signed or submitted. This update follows the section "Owner rulings and the proposed line (added 2026-10-07)" above and the program plan's section 5A.12 (Personal-Tracker `PORTING_PROGRAM.md`, [PR #10](https://github.com/mbaliga/Personal-Tracker/pull/10)), which governs where the two differ. It records the owner's market lens and answers of 2026-10-13 and 2026-10-14; the proposed line is still a proposal. Two tests were added to the program's section 5A.1: (d) a real gap, or we are better or cheaper ("better" only where it has been measured; free alone is no gap when free tools exist); (w) mature free alternatives abound and the app adds nothing.
+
+### Where mw75-streamer sits now (program section 5A.12, a proposal)
+
+| Target       | Verdict, weeks and flags |
+| ------------ | ------------------------ |
+| Ubuntu Touch | no-port                  |
+| Linux        | port 1.5w                |
+| iPhone       | no-port                  |
+| iPad         | no-port                  |
+| macOS        | exists 0.2w              |
+| Windows      | exists                   |
+
+### What changed for this repo
+
+- Ubuntu Touch is now **no-port** for now (the earlier section had owner-call 4w): a foreground-only capture click, with RFCOMM kernel support unverified on the OnePlus 6.
+- Windows is now **exists** (the earlier section had port 2w): upstream arctop/mw75-streamer already ships Windows 11 RFCOMM streaming (commit dated 2026-08-14), so the work becomes syncing this fork to upstream, settling PR #3 (OQ-13) and a hardware check.
+
+### Owner answers that apply here
+
+- **Skin contract (OQ-39, 2026-10-14):** proposed conformance level for this app: Level 1-T or Level 0, at the owner's choice. The owner chose Tier 1 (palette) everywhere first and every app declaring its own level; the assistant chose JSON, not XML, after the owner asked for a check; the draft spec is Personal-Tracker `porting/skin-contract/SPEC-DRAFT.md`. This is a proposal, not decided for this app.
+
+When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A.12 change.
