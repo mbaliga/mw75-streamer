@@ -17,6 +17,8 @@ Stream 12-channel EEG data from MW75 Neuro headphones with WebSocket, CSV, and L
 > `main` is **macOS-only** (v1.0.8 beta). A **Linux port** (stdlib `AF_BLUETOOTH` RFCOMM + BlueZ)
 > exists on the open **PR #1** and is planned to land under **`baseline` Phase 1** (fork + port,
 > then contribute back upstream). Windows is still unimplemented.
+>
+> **Porting plan** (fork-only; not part of upstream PRs): [`PORTING_PLAN.md`](PORTING_PLAN.md).
 
 **About `uv`:** This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable Python package management. Benefits include faster installs, better dependency resolution, and reproducible environments. All commands can be run with regular Python too (see [Alternative: Using Python Directly](#alternative-using-python-directly)), but we use `uv` throughout this documentation for consistency.
 

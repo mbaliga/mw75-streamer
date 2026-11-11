@@ -1,3 +1,6 @@
+# BSD sed (macOS) needs an empty backup suffix argument; GNU sed (Linux) must not get one.
+SED_INPLACE := $(if $(filter Darwin,$(shell uname -s)),sed -i '',sed -i)
+
 .PHONY: help docs docs-serve docs-clean install install-dev install-hooks test lint format type-check check clean version-patch version-minor version-major
 
 # Default target
@@ -106,10 +109,10 @@ version-patch:
 	new_patch=$$((patch + 1)); \
 	new_version="$$major.$$minor.$$new_patch"; \
 	echo "Updating version from $$current_version to $$new_version"; \
-	sed -i '' "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
-	sed -i '' "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
-	sed -i '' "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
-	sed -i '' "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
+	$(SED_INPLACE) "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
+	$(SED_INPLACE) "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
+	$(SED_INPLACE) "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
+	$(SED_INPLACE) "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
 	echo "Updated pyproject.toml, __init__.py, and docs-src/conf.py to version $$new_version"
 
 version-minor:
@@ -120,10 +123,10 @@ version-minor:
 	new_minor=$$((minor + 1)); \
 	new_version="$$major.$$new_minor.0"; \
 	echo "Updating version from $$current_version to $$new_version"; \
-	sed -i '' "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
-	sed -i '' "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
-	sed -i '' "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
-	sed -i '' "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
+	$(SED_INPLACE) "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
+	$(SED_INPLACE) "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
+	$(SED_INPLACE) "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
+	$(SED_INPLACE) "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
 	echo "Updated pyproject.toml, __init__.py, and docs-src/conf.py to version $$new_version"
 
 version-major:
@@ -133,8 +136,8 @@ version-major:
 	new_major=$$((major + 1)); \
 	new_version="$$new_major.0.0"; \
 	echo "Updating version from $$current_version to $$new_version"; \
-	sed -i '' "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
-	sed -i '' "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
-	sed -i '' "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
-	sed -i '' "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
+	$(SED_INPLACE) "s/^version = \".*\"/version = \"$$new_version\"/" pyproject.toml; \
+	$(SED_INPLACE) "s/__version__ = \".*\"/__version__ = \"$$new_version\"/" mw75_streamer/__init__.py; \
+	$(SED_INPLACE) "s/^release = .*/release = '$$new_version'/" docs-src/conf.py; \
+	$(SED_INPLACE) "s/^version = .*/version = '$$new_version'/" docs-src/conf.py; \
 	echo "Updated pyproject.toml, __init__.py, and docs-src/conf.py to version $$new_version"
