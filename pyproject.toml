@@ -45,6 +45,10 @@ lsl = [
 testing = [
     "websockets>=11.0.0"
 ]
+test = [
+    "pytest>=7.0.0",
+    "tomli>=2.0.0; python_version < '3.11'"
+]
 docs = [
     "sphinx>=7.0.0",
     "sphinx-rtd-theme>=2.0.0",
@@ -82,7 +86,7 @@ mw75-streamer = "mw75_streamer.main:cli_main"
 mw75-test-server = "mw75_streamer.testing.__main__:main"
 
 [tool.setuptools]
-packages = ["mw75_streamer", "mw75_streamer.assets", "mw75_streamer.device", "mw75_streamer.data", "mw75_streamer.panel", "mw75_streamer.testing", "mw75_streamer.utils"]
+packages = ["mw75_streamer", "mw75_streamer.assets", "mw75_streamer.device", "mw75_streamer.data", "mw75_streamer.panel", "mw75_streamer.server", "mw75_streamer.testing", "mw75_streamer.utils"]
 
 [tool.setuptools.package-data]
 "mw75_streamer.assets" = ["*.webp", "*.png", "*.jpg", "*.svg"]
